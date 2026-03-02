@@ -425,3 +425,5 @@ window.magic8 = {
   getLast3: () => loadLast3(),
   buildShareText,
 };
+
+//this is a test commit to see if wakka time is actualy seeing my commits
