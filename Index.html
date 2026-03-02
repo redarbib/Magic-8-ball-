@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Online Magic 8-Ball+</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <main class="app">
+            <header class="hero">
+                <p class="eyebrow">Online Magic 8-Ball+</p>
+                <h1>Ask anything. Get a bold answer.</h1>
+                <p class="sub">Pick a vibe, ask a question, and let fate decide.</p>
+            </header>
+
+            <section class="card">
+                <form id="questionForm" class="form">
+                    <label class="label" for="questionInput">Your question</label>
+                    <div class="input-row">
+                        <input
+                            id="questionInput"
+                            name="question"
+                            type="text"
+                            placeholder="Will I ace my next exam?"
+                            autocomplete="off"
+                            maxlength="160"
+                            required
+                        />
+                        <button class="btn" type="submit">Ask</button>
+                    </div>
+
+                    <div class="modes" role="radiogroup" aria-label="Answer mode">
+                        <button
+                            class="mode active"
+                            type="button"
+                            data-mode="funny"
+                            role="radio"
+                            aria-checked="true"
+                        >
+                            Funny
+                        </button>
+                        <button
+                            class="mode"
+                            type="button"
+                            data-mode="serious"
+                            role="radio"
+                            aria-checked="false"
+                        >
+                            Serious
+                        </button>
+                        <button
+                            class="mode"
+                            type="button"
+                            data-mode="savage"
+                            role="radio"
+                            aria-checked="false"
+                        >
+                            Savage
+                        </button>
+                    </div>
+
+                    <label class="toggle">
+                        <input id="saveHistory" type="checkbox" checked />
+                        <span>Save my questions locally</span>
+                    </label>
+                </form>
+
+                <div class="answer" id="answerBox" aria-live="polite">
+                    <p class="answer-text" id="answerText">
+                        Ask a question to reveal your answer.
+                    </p>
+                    <div class="confidence" id="confidenceWrap" hidden>
+                        <span class="confidence-label">Confidence</span>
+                        <span class="confidence-value" id="confidenceValue">0%</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="history">
+                <div class="history-header">
+                    <h2>Recent questions</h2>
+                    <button id="clearHistory" class="link" type="button">Clear</button>
+                </div>
+                <ul id="historyList" class="history-list"></ul>
+            </section>
+        </main>
+
+        <script src="script.js"></script>
+    </body>
+</html>
