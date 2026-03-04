@@ -10,5 +10,5 @@ A simple (but fun) web app where you ask a question and get a random answer  wit
 - Clear history button
 
 ## Tech
-- HTML + CSS + Vanilla JavaScript
+- HTML + CSS + VanIlla JavaScript
 - No backend required
