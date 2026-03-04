@@ -481,8 +481,14 @@ const applyCooldown = (ms) => {
 
 const isCoolingDown = () => Date.now() < cooldownUntil;
 
+const exitFullscreenIfActive = () => {
+  if (!document.fullscreenElement) return;
+  document.exitFullscreen().catch(() => {});
+};
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  exitFullscreenIfActive();
   if (isCoolingDown()) return;
 
   const raw = questionInput.value;
