@@ -79,6 +79,10 @@
                         <input id="saveHistory" type="checkbox" checked />
                         <span>Save my questions locally</span>
                     </label>
+                    <label class="toggle">
+                        <input id="enableMotion" type="checkbox" checked />
+                        <span>Enable answer animations</span>
+                    </label>
                 </form>
 
                 <div class="answer" id="answerBox" aria-live="polite">
@@ -89,14 +93,47 @@
                     <div class="confidence" id="confidenceWrap" hidden>
                         <span class="confidence-label">Confidence</span>
                         <span class="confidence-value" id="confidenceValue">0%</span>
+                        <button class="info" id="confidenceInfo" type="button" title="Based on question length and punctuation.">?</button>
                     </div>
+                </div>
+            </section>
+
+            <section class="insights">
+                <div class="insights-header">
+                    <h2>Insights</h2>
+                </div>
+                <div class="insights-grid">
+                    <div class="stat">
+                        <span class="stat-label">Total questions</span>
+                        <span class="stat-value" id="statTotal">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Yes streak</span>
+                        <span class="stat-value" id="statYesStreak">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">No streak</span>
+                        <span class="stat-value" id="statNoStreak">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Last mode</span>
+                        <span class="stat-value" id="statLastMode">-</span>
+                    </div>
+                </div>
+                <div class="last3">
+                    <h3>Last 3 answers</h3>
+                    <ul id="last3List" class="last3-list"></ul>
                 </div>
             </section>
 
             <section class="history">
                 <div class="history-header">
                     <h2>Recent questions</h2>
-                    <button id="clearHistory" class="link" type="button">Clear</button>
+                    <div class="history-actions">
+                        <input id="historySearch" type="search" placeholder="Search history" aria-label="Search history" />
+                        <button id="exportHistory" class="link" type="button">Export</button>
+                        <button id="clearHistory" class="link" type="button">Clear</button>
+                    </div>
                 </div>
                 <ul id="historyList" class="history-list"></ul>
             </section>

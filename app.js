@@ -69,13 +69,27 @@ const timeBias = {
 };
 
 const easterEggs = [
-  { match: /open the pod bay doors|hal 9000/i, text: "I am sorry, Dave. I am afraid I cannot do that.", tag: "no" },
-  { match: /meaning of life|42/i, text: "42. But you already knew that.", tag: "yes" },
-  { match: /rickroll|never gonna give you up/i, text: "Never gonna give you up. Yes.", tag: "yes" },
+  { match: /\btars\b/i, text: "TARS online. Humor 90. Answer: maybe.", tag: "maybe", activateTarsMode: true },
+  { match: /your next line will be/i, text: "I can already hear your next line: yes.", tag: "yes" },
+  { match: /\bmachine\b/i, text: "Gabriel speaks: machine, your answer is no.", tag: "no" },
+];
+
+const tarsResponses = [
+  { text: "TARS: Probability suggests yes.", tag: "yes", weight: 1 },
+  { text: "TARS: Negative. Risk exceeds threshold.", tag: "no", weight: 1 },
+  { text: "TARS: Maybe. Data insufficient.", tag: "maybe", weight: 1 },
+  { text: "TARS: Yes, but keep contingency plans ready.", tag: "yes", weight: 1 },
+  { text: "TARS: No. Resource cost too high.", tag: "no", weight: 1 },
+  { text: "TARS: Maybe, if you reduce complexity.", tag: "maybe", weight: 1 },
+  { text: "TARS: Yes. Execute with caution.", tag: "yes", weight: 1 },
+  { text: "TARS: No. Re-evaluate your objective.", tag: "no", weight: 1 },
+  { text: "TARS: Maybe. Update parameters and retry.", tag: "maybe", weight: 1 },
+  { text: "TARS: Yes, within acceptable tolerances.", tag: "yes", weight: 1 },
 ];
 
 const form = document.getElementById("questionForm");
 const questionInput = document.getElementById("questionInput");
+const answerBox = document.getElementById("answerBox");
 const answerQuestion = document.getElementById("answerQuestion");
 const answerText = document.getElementById("answerText");
 const confidenceWrap = document.getElementById("confidenceWrap");
@@ -83,18 +97,29 @@ const confidenceValue = document.getElementById("confidenceValue");
 const modeButtons = Array.from(document.querySelectorAll(".mode"));
 const historyList = document.getElementById("historyList");
 const saveHistoryToggle = document.getElementById("saveHistory");
+const enableMotionToggle = document.getElementById("enableMotion");
+const historySearchInput = document.getElementById("historySearch");
+const exportHistoryBtn = document.getElementById("exportHistory");
 const clearHistoryBtn = document.getElementById("clearHistory");
+const statTotal = document.getElementById("statTotal");
+const statYesStreak = document.getElementById("statYesStreak");
+const statNoStreak = document.getElementById("statNoStreak");
+const statLastMode = document.getElementById("statLastMode");
+const last3List = document.getElementById("last3List");
 
 const STORAGE_KEY = "magic8History";
 const STATS_KEY = "magic8Stats";
 const FAVORITES_KEY = "magic8FavoritesOnly";
 const LAST3_KEY = "magic8Last3";
+const MOTION_KEY = "magic8Motion";
 
 let activeMode = "funny";
 let yesStreak = 0;
 let noStreak = 0;
 let lastAnswer = null;
 let cooldownUntil = 0;
+let tarsModeCount = 0;
+let historySearchTerm = "";
 
 const getRandomItem = (items, rng) => items[Math.floor(rng() * items.length)];
 
@@ -169,11 +194,11 @@ const saveHistory = (items) => {
 
 const loadStats = () => {
   const stored = localStorage.getItem(STATS_KEY);
-  if (!stored) return { total: 0, modes: { funny: 0, serious: 0, savage: 0 } };
+  if (!stored) return { total: 0, modes: { funny: 0, serious: 0, savage: 0, tars: 0 } };
   try {
     return JSON.parse(stored);
   } catch {
-    return { total: 0, modes: { funny: 0, serious: 0, savage: 0 } };
+    return { total: 0, modes: { funny: 0, serious: 0, savage: 0, tars: 0 } };
   }
 };
 
@@ -198,6 +223,16 @@ const saveLast3 = (items) => {
   localStorage.setItem(LAST3_KEY, JSON.stringify(items.slice(0, 3)));
 };
 
+const loadMotionEnabled = () => {
+  const stored = localStorage.getItem(MOTION_KEY);
+  if (stored === null) return true;
+  return stored === "true";
+};
+
+const saveMotionEnabled = (value) => {
+  localStorage.setItem(MOTION_KEY, value ? "true" : "false");
+};
+
 const buildShareText = (entry) => {
   return `Online Magic 8-Ball+ says: "${entry.answer}" (${entry.confidence}%)`;
 };
@@ -206,224 +241,59 @@ const renderHistory = (items, favoritesOnly) => {
   if (!historyList) return;
   historyList.innerHTML = "";
   const displayItems = favoritesOnly ? items.filter((item) => item.starred) : items;
-  if (!displayItems.length) {
+  const term = historySearchTerm.trim().toLowerCase();
+const filtered = term    ? displayItems.filter((item) => {
+        const questionMatch = item.question.toLowerCase().includes(term);
+        const answerMatch = item.answer.toLowerCase().includes(term);
+        return questionMatch || answerMatch;
+})
+    : displayItems;
+  if (!filtered.length) {
     const empty = document.createElement("li");
     empty.className = "history-item";
-    empty.textContent = favoritesOnly ? "No favorites yet." : "No saved questions yet.";
-    historyList.appendChild(empty);
-    return;
-  }
-  displayItems.forEach((item, index) => {
-    const li = document.createElement("li");
-    li.className = "history-item";
-
-    const q = document.createElement("div");
-    q.className = "history-question";
-    q.textContent = item.question;
-
-    const meta = document.createElement("div");
-    meta.className = "history-answer";
-    meta.textContent = `${item.answer} (${item.confidence}%) • ${item.mode} • ${new Date(item.timestamp).toLocaleString()}`;
-
-    const star = document.createElement("button");
-    star.type = "button";
-    star.className = "link";
-    star.textContent = item.starred ? "Unstar" : "Star";
-    star.addEventListener("click", () => {
-      item.starred = !item.starred;
-      saveHistory(historyItems);
-      renderHistory(historyItems, favoritesOnly);
-    });
-
-    li.appendChild(q);
-    li.appendChild(meta);
-    li.appendChild(star);
-    historyList.appendChild(li);
-});
-};
-
-const setActiveMode = (mode) => {
-  activeMode = mode;
-  modeButtons.forEach((btn) => {
-    const isActive = btn.CDATA_SECTION_NODE.mode === mode;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-checked", String(isActive));
-  });
-};
-
-const historyItems = loadHistory();
-const stats = loadStats();
-let favoritesOnly = loadFavoritesOnly();
-renderHistory(historyItems, favoritesOnly);
-
-const insertHistoryControls = () => {
-  const header = document.querySelector(".history-header");
-  if (!header) return;
-  if (header.querySelector(".favorites-toggle")) return;
-
-  const favoritesBtn = document.createElement("button");
-  favoritesBtn.type = "button";
-  favoritesBtn.className = "link favorites-toggle";
-  favoritesBtn.textContent = favoritesOnly ? "Show All" : "Show Favorites";
-  favoritesBtn.addEventListener("click", () => {
-    favoritesOnly = !favoritesOnly;
-    saveFavoritesOnly(favoritesOnly);
-    favoritesBtn.textContent = favoritesOnly ? "Show All" : "Show Favorites";
-    renderHistory(historyItems, favoritesOnly);
-  });
-
-  const undoBtn = document.createElement("button");
-  undoBtn.type = "button";
-  undoBtn.className = "link undo-last";
-  undoBtn.textContent = "Undo";
-  undoBtn.addEventListener("click", () => {
-    if (!historyItems.length) return;
-    historyItems.shift();
-    saveHistory(historyItems);
-    renderHistory(historyItems, favoritesOnly);
-    const previous = historyItems[0];
-    if (previous) {
-      if (answerQuestion) answerQuestion.textContent = previous.question;
-      answerText.textContent = previous.answer;
-      confidenceWrap.hidden = false;
-      confidenceValue.textContent = `${previous.confidence}%`;
-    }
-});
-
-  header.appendChild(favoritesBtn);
-  header.appendChild(undoBtn);
-};
-
-insertHistoryControls();
-
-modeButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const selected = btn.CDATA_SECTION_NODE.mode;
-    if (selected === "random") {
-      setActiveMode("random");
+    if (term) {
+      empty.textContent = "No matches yet.";
     } else {
-      setActiveMode(selected);
+      empty.textContent = favoritesOnly ? "No favorites yet." : "No saved questions yet.";
     }
-});
-});
-
-const applyStreaks = (tag) => {
-  if (tag === "yes") {
-    yesStreak += 1;
-    noStreak = 0;
-  } else if (tag === "no") {
-    noStreak += 1;
-    yesStreak = 0;
-  } else {
-    yesStreak = 0;
-    noStreak = 0;
+    historyList.
+    }
+    }
   }
-};
-
-const pickAnswer = (question, mode) => {
-  const date = new Date();
-  const bucket = getTimeBucket(date);
-  const theme = detectTheme(question);
-  const seed = `${question.toLowerCase()}-${date.toDateString()}-${mode}`;
-  const rng = seededRng(seed);
-
-  for (const egg of easterEggs) {
-    if (egg.match.test(question)) {
-      return { text: egg.text, tag: egg.tag, modeUsed: mode, isEgg: true };
-    }
+})
 }
-
-  let pool = responses[mode] || responses.funny;
-  if (theme && themedResponses[theme]) {
-    pool = pool.concat(themedResponses[theme]);
-  }
-  if (timeBias[bucket]) {
-    pool = pool.concat(timeBias[bucket]);
-  }
-
-  const picked = getWeightedRandom(pool, rng);
-  return { text: picked.text, tag: picked.tag || "maybe", modeUsed: mode, isEgg: false };
-};
-
-const getModeForQuestion = () => {
-  if (activeMode === "random") {
-    return getRandomItem(["funny", "serious", "savage"], Math.random);
-  }
-  return activeMode;
-};
-
-const applyCooldown = (ms) => {
-  cooldownUntil = Date.now() + ms;
-};
-
-const isCoolingDown = () => Date.now() < cooldownUntil;
-
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  if (isCoolingDown()) return;
-
-  const raw = questionInput.value;
-  const question = sanitizeQuestion(raw);
-  if (!question) return;
-
-  applyCooldown(900);
-  if (answerText) answerText.textContent = "Thinking...";
-
-  setTimeout(() => {
-    const modeUsed = getModeForQuestion();
-    const answerData = pickAnswer(question, modeUsed);
-    const confidence = getConfidence(question);
-    applyStreaks(answerData.tag);
-
-    if (answerQuestion) answerQuestion.textContent = question;
-    answerText.textContent = answerData.text;
-    confidenceWrap.hidden = false;
-    confidenceValue.textContent = `${confidence}%`;
-
-    const entry = {
-      question,
-      answer: answerData.text,
-      confidence,
-      mode: modeUsed,
-      timestamp: new Date().toISOString(),
-      starred: false,
-      streak: { yes: yesStreak, no: noStreak },
-      share: buildShareText({ answer: answerData.text, confidence }),
-    };
-
-    stats.total += 1;
-    stats.modes[modeUsed] = (stats.modes[modeUsed] || 0) + 1;
-    saveStats(stats);
-
-    lastAnswer = entry;
-    const last3 = [entry, ...loadLast3()].slice(0, 3);
-    saveLast3(last3);
-
-    if (saveHistoryToggle && saveHistoryToggle.checked) {
-      const updated = [entry, ...historyItems].slice(0, 20);
-      historyItems.splice(0, historyItems.length, ...updated);
-      saveHistory(historyItems);
-      renderHistory(historyItems, favoritesOnly);
-    }
-
-    form.requestFullscreen();
-    questionInput.focus();
-}, 450);
-});
-
-if (clearHistoryBtn) {
-  clearHistoryBtn.addEventListener("click", () => {
-    historyItems.splice(0, historyItems.length);
-    localStorage.removeItem(STORAGE_KEY);
-    renderHistory(historyItems, favoritesOnly);
-  });
 }
-
-window.magic8 = {
-  getStats: () => ({ ...stats }),
-  getLastAnswer: () => lastAnswer,
-  getLast3: () => loadLast3(),
-  buildShareText,
-};
-
-//this is a test commit to see if wakka time is actualy seeing my commits
+}
+}
+}
+  }
+  }
+}
+}
+  }
+  }
+}
+}
+  }
+  }
+}
+  }
+  }
+}
+}
+}
+}
+}
+  }
+}
+]
+]
+}
+  ]
+  ]
+  ]
+}
+  ]
+  ]
+  ]
+}
