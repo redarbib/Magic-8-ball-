@@ -242,11 +242,12 @@ const renderHistory = (items, favoritesOnly) => {
   historyList.innerHTML = "";
   const displayItems = favoritesOnly ? items.filter((item) => item.starred) : items;
   const term = historySearchTerm.trim().toLowerCase();
-const filtered = term    ? displayItems.filter((item) => {
+  const filtered = term
+    ? displayItems.filter((item) => {
         const questionMatch = item.question.toLowerCase().includes(term);
         const answerMatch = item.answer.toLowerCase().includes(term);
         return questionMatch || answerMatch;
-})
+      })
     : displayItems;
   if (!filtered.length) {
     const empty = document.createElement("li");
@@ -256,44 +257,302 @@ const filtered = term    ? displayItems.filter((item) => {
     } else {
       empty.textContent = favoritesOnly ? "No favorites yet." : "No saved questions yet.";
     }
-    historyList.
+    historyList.appendChild(empty);
+    return;
+  }
+  filtered.forEach((item, index) => {
+    const li = document.createElement("li");
+    li.className = "history-item";
+
+    const q = document.createElement("div");
+    q.className = "history-question";
+    q.textContent = item.question;
+
+    const meta = document.createElement("div");
+    meta.className = "history-answer";
+    meta.textContent = `${item.answer} (${item.confidence}%) • ${item.mode} • ${new Date(item.timestamp).toLocaleString()}`;
+
+    const star = document.createElement("button");
+    star.type = "button";
+    star.className = "link";
+    star.textContent = item.starred ? "Unstar" : "Star";
+    star.addEventListener("click", () => {
+      item.starred = !item.starred;
+      saveHistory(historyItems);
+      renderHistory(historyItems, favoritesOnly);
+    });
+
+    li.appendChild(q);
+    li.appendChild(meta);
+    li.appendChild(star);
+    historyList.appendChild(li);
+  });
+};
+
+const renderLast3 = () => {
+  if (!last3List) return;
+  last3List.innerHTML = "";
+  const last3 = loadLast3();
+  if (!last3.length) {
+    const empty = document.createElement("li");
+    empty.textContent = "No answers yet.";
+    last3List.appendChild(empty);
+    return;
+  }
+  last3.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = `${item.answer} (${item.confidence}%)`;
+    last3List.appendChild(li);
+  });
+};
+
+const updateInsights = () => {
+  if (statTotal) statTotal.textContent = String(stats.total || 0);
+  if (statYesStreak) statYesStreak.textContent = String(yesStreak);
+  if (statNoStreak) statNoStreak.textContent = String(noStreak);
+  if (statLastMode) statLastMode.textContent = lastAnswer ? lastAnswer.mode : "-";
+  renderLast3();
+};
+
+const triggerAnswerAnimation = () => {
+  if (!answerBox) return;
+  const motionEnabled = enableMotionToggle ? enableMotionToggle.checked : true;
+  if (!motionEnabled) return;
+  answerBox.classList.remove("animate");
+  void answerBox.offsetWidth;
+  answerBox.classList.add("animate");
+};
+
+const setActiveMode = (mode) => {
+  activeMode = mode;
+  modeButtons.forEach((btn) => {
+    const isActive = btn.dataset.mode === mode;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-checked", String(isActive));
+  });
+};
+
+const historyItems = loadHistory();
+const stats = loadStats();
+let favoritesOnly = loadFavoritesOnly();
+renderHistory(historyItems, favoritesOnly);
+updateInsights();
+
+if (enableMotionToggle) {
+  const motionEnabled = loadMotionEnabled();
+  enableMotionToggle.checked = motionEnabled;
+  enableMotionToggle.addEventListener("change", () => {
+    saveMotionEnabled(enableMotionToggle.checked);
+  });
+}
+
+const insertHistoryControls = () => {
+  const header = document.querySelector(".history-header");
+  if (!header) return;
+  if (header.querySelector(".favorites-toggle")) return;
+
+  const favoritesBtn = document.createElement("button");
+  favoritesBtn.type = "button";
+  favoritesBtn.className = "link favorites-toggle";
+  favoritesBtn.textContent = favoritesOnly ? "Show All" : "Show Favorites";
+  favoritesBtn.addEventListener("click", () => {
+    favoritesOnly = !favoritesOnly;
+    saveFavoritesOnly(favoritesOnly);
+    favoritesBtn.textContent = favoritesOnly ? "Show All" : "Show Favorites";
+    renderHistory(historyItems, favoritesOnly);
+  });
+
+  const undoBtn = document.createElement("button");
+  undoBtn.type = "button";
+  undoBtn.className = "link undo-last";
+  undoBtn.textContent = "Undo";
+  undoBtn.addEventListener("click", () => {
+    if (!historyItems.length) return;
+    historyItems.shift();
+    saveHistory(historyItems);
+    renderHistory(historyItems, favoritesOnly);
+    const previous = historyItems[0];
+    if (previous) {
+      if (answerQuestion) answerQuestion.textContent = previous.question;
+      answerText.textContent = previous.answer;
+      confidenceWrap.hidden = false;
+      confidenceValue.textContent = `${previous.confidence}%`;
     }
+    updateInsights();
+  });
+
+  header.appendChild(favoritesBtn);
+  header.appendChild(undoBtn);
+};
+
+insertHistoryControls();
+
+if (historySearchInput) {
+  historySearchInput.addEventListener("input", (event) => {
+    historySearchTerm = event.target.value;
+    renderHistory(historyItems, favoritesOnly);
+  });
+}
+
+if (exportHistoryBtn) {
+  exportHistoryBtn.addEventListener("click", () => {
+    if (!historyItems.length) return;
+    const payload = JSON.stringify(historyItems, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "magic8-history.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  });
+}
+
+modeButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const selected = btn.dataset.mode;
+    if (selected === "random") {
+      setActiveMode("random");
+    } else {
+      setActiveMode(selected);
+    }
+  });
+});
+
+const applyStreaks = (tag) => {
+  if (tag === "yes") {
+    yesStreak += 1;
+    noStreak = 0;
+  } else if (tag === "no") {
+    noStreak += 1;
+    yesStreak = 0;
+  } else {
+    yesStreak = 0;
+    noStreak = 0;
+  }
+};
+
+const pickAnswer = (question, mode) => {
+  const date = new Date();
+  const bucket = getTimeBucket(date);
+  const theme = detectTheme(question);
+  const seed = `${question.toLowerCase()}-${date.toDateString()}-${mode}`;
+  const rng = seededRng(seed);
+
+  for (const egg of easterEggs) {
+    if (egg.match.test(question)) {
+      if (egg.activateTarsMode) {
+        tarsModeCount = 10;
+      }
+      return { text: egg.text, tag: egg.tag, modeUsed: mode, isEgg: true };
     }
   }
-})
-}
-}
-}
-}
-}
+
+  if (tarsModeCount > 0) {
+    const picked = getWeightedRandom(tarsResponses, rng);
+    tarsModeCount -= 1;
+    return { text: picked.text, tag: picked.tag || "maybe", modeUsed: "tars", isEgg: false };
   }
+
+  let pool = responses[mode] || responses.funny;
+  if (theme && themedResponses[theme]) {
+    pool = pool.concat(themedResponses[theme]);
   }
-}
-}
+  if (timeBias[bucket]) {
+    pool = pool.concat(timeBias[bucket]);
   }
+
+  const picked = getWeightedRandom(pool, rng);
+  return { text: picked.text, tag: picked.tag || "maybe", modeUsed: mode, isEgg: false };
+};
+
+const getModeForQuestion = () => {
+  if (activeMode === "random") {
+    return getRandomItem(["funny", "serious", "savage"], Math.random);
   }
+  return activeMode;
+};
+
+const applyCooldown = (ms) => {
+  cooldownUntil = Date.now() + ms;
+};
+
+const isCoolingDown = () => Date.now() < cooldownUntil;
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (isCoolingDown()) return;
+
+  const raw = questionInput.value;
+  const question = sanitizeQuestion(raw);
+  if (!question) return;
+
+  applyCooldown(900);
+  if (answerText) answerText.textContent = "Thinking...";
+
+  setTimeout(() => {
+    const modeUsed = getModeForQuestion();
+    const answerData = pickAnswer(question, modeUsed);
+    const confidence = getConfidence(question);
+    applyStreaks(answerData.tag);
+
+    if (answerQuestion) answerQuestion.textContent = question;
+    answerText.textContent = answerData.text;
+    confidenceWrap.hidden = false;
+    confidenceValue.textContent = `${confidence}%`;
+    triggerAnswerAnimation();
+
+    const entry = {
+      question,
+      answer: answerData.text,
+      confidence,
+      mode: modeUsed,
+      timestamp: new Date().toISOString(),
+      starred: false,
+      streak: { yes: yesStreak, no: noStreak },
+      share: buildShareText({ answer: answerData.text, confidence }),
+    };
+
+    stats.total += 1;
+    stats.modes[modeUsed] = (stats.modes[modeUsed] || 0) + 1;
+    saveStats(stats);
+
+    lastAnswer = entry;
+    const last3 = [entry, ...loadLast3()].slice(0, 3);
+    saveLast3(last3);
+    updateInsights();
+
+    if (saveHistoryToggle && saveHistoryToggle.checked) {
+      const updated = [entry, ...historyItems].slice(0, 20);
+      historyItems.splice(0, historyItems.length, ...updated);
+      saveHistory(historyItems);
+      renderHistory(historyItems, favoritesOnly);
+    }
+
+    questionInput.focus();
+  }, 450);
+});
+
+if (clearHistoryBtn) {
+  clearHistoryBtn.addEventListener("click", () => {
+    historyItems.splice(0, historyItems.length);
+    localStorage.removeItem(STORAGE_KEY);
+    renderHistory(historyItems, favoritesOnly);
+    updateInsights();
+  });
 }
+
+if (answerBox) {
+  answerBox.addEventListener("animationend", () => {
+    answerBox.classList.remove("animate");
+  });
 }
-  }
-  }
-}
-  }
-  }
-}
-}
-}
-}
-}
-  }
-}
-]
-]
-}
-  ]
-  ]
-  ]
-}
-  ]
-  ]
-  ]
-}
+
+window.magic8 = {
+  getStats: () => ({ ...stats }),
+  getLastAnswer: () => lastAnswer,
+  getLast3: () => loadLast3(),
+  buildShareText,
+};
